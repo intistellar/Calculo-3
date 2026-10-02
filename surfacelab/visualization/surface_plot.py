@@ -136,3 +136,73 @@ class VectorPlot:
             fz = r_fn(U, V) * scale
             return x, y, z, fx, fy, fz
         return None, None, None, None, None, None
+# Métodos adicionales para visualización de cálculo vectorial
+
+from surfacelab.core.vector_calculus import VectorOperator
+
+
+class VectorCalculusPlot:
+    """Clase para visualizar operadores vectoriales sobre superficies."""
+
+    @staticmethod
+    def plot_curl_over_surface(
+        model,
+        vector_field: str,
+        resolution: int = 10,
+        scale: float = 0.4,
+        color: str = "red",
+    ):
+        """Calcular y visualizar el rotacional sobre la superficie."""
+        try:
+            curl_x, curl_y, curl_z = VectorOperator.curl(vector_field, "cartesian")
+            return {
+                "curl_x": str(curl_x),
+                "curl_y": str(curl_y),
+                "curl_z": str(curl_z),
+                "expression": f"({curl_x}, {curl_y}, {curl_z})",
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
+    def plot_divergence_over_surface(
+        model,
+        vector_field: str,
+    ):
+        """Calcular divergencia del campo sobre la superficie."""
+        try:
+            div = VectorOperator.divergence(vector_field, "cartesian")
+            return {"divergence": str(div), "expression": div}
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
+    def plot_gradient_over_surface(
+        model,
+        scalar_field: str,
+    ):
+        """Calcular gradiente del campo escalar."""
+        try:
+            grad_x, grad_y, grad_z = VectorOperator.gradient(scalar_field, "cartesian")
+            return {
+                "grad_x": str(grad_x),
+                "grad_y": str(grad_y),
+                "grad_z": str(grad_z),
+                "expression": f"({grad_x}, {grad_y}, {grad_z})",
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
+    def compute_surface_divergence(
+        model,
+        vector_field: str,
+    ):
+        """Calcular flujo saliente en superficie cerrada."""
+        try:
+            flux = VectorOperator.compute_flux_through_surface(
+                vector_field, str(model.func_expr)
+            )
+            return {"flux_expression": str(flux), "expression": flux}
+        except Exception as e:
+            return {"error": str(e)}
