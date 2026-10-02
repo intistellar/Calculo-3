@@ -16,7 +16,7 @@ from surfacelab.models.surface_model import Limits, SurfaceSystem
 from surfacelab.utils.export import ResultExporter
 from surfacelab.utils.theory import TheoryPanel
 from surfacelab.visualization.vector_plot import MatplotlibSurfaceRenderer
-from surfacelab.visualization.surface_plot import SurfacePlot
+from surfacelab.visualization.surface_plot import SurfacePlot, SurfaceAnalyzer
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
@@ -39,6 +39,11 @@ class MainWindow(ctk.CTk):
         self.var_show_curl = ctk.BooleanVar(value=False)
         self.var_show_gradient = ctk.BooleanVar(value=False)
         self.var_show_divergence = ctk.BooleanVar(value=False)
+        
+        # Variables para visualización avanzada
+        self.var_show_wireframe = ctk.BooleanVar(value=False)
+        self.var_show_axes = ctk.BooleanVar(value=True)
+        self.var_show_contour = ctk.BooleanVar(value=False)
 
         # Variables para campos
         self.vector_field_expr = "x, y, z"
@@ -152,6 +157,30 @@ class MainWindow(ctk.CTk):
         ctk.CTkCheckBox(viz_frame, text="Mostrar rotacional (∇×F)", variable=self.var_show_curl).pack(padx=12, pady=2, anchor="w")
         ctk.CTkCheckBox(viz_frame, text="Mostrar gradiente (∇f)", variable=self.var_show_gradient).pack(padx=12, pady=2, anchor="w")
         ctk.CTkCheckBox(viz_frame, text="Mostrar divergencia (∇·F)", variable=self.var_show_divergence).pack(padx=12, pady=2, anchor="w")
+        
+        # === Visualización avanzada ===
+        adv_viz_frame = ctk.CTkFrame(parent)
+        adv_viz_frame.pack(padx=12, pady=(8, 8), fill="x")
+        ctk.CTkLabel(adv_viz_frame, text="Visualización Avanzada", font=ctk.CTkFont(weight="bold")).pack(padx=12, pady=(8, 4), anchor="w")
+        
+        ctk.CTkCheckBox(adv_viz_frame, text="Mostrar wireframe (malla)", variable=self.var_show_wireframe).pack(padx=12, pady=2, anchor="w")
+        ctk.CTkCheckBox(adv_viz_frame, text="Mostrar ejes (XYZ)", variable=self.var_show_axes).pack(padx=12, pady=2, anchor="w")
+        ctk.CTkCheckBox(adv_viz_frame, text="Mostrar contour (líneas nivel)", variable=self.var_show_contour).pack(padx=12, pady=2, anchor="w")
+        
+        # Selector de proyección para contour
+        ctk.CTkLabel(adv_viz_frame, text="Proyección contour:", font=ctk.CTkFont(size=10)).pack(padx=12, pady=(4, 0), anchor="w")
+        self.contour_projection = ctk.CTkOptionMenu(adv_viz_frame, values=["xy", "xz", "yz"])
+        self.contour_projection.set("xy")
+        self.contour_projection.pack(padx=12, pady=(0, 8), fill="x")
+        
+        # Vistas predefinidas
+        ctk.CTkLabel(adv_viz_frame, text="Vista predefinida:", font=ctk.CTkFont(size=10)).pack(padx=12, pady=(4, 0), anchor="w")
+        view_btn_frame = ctk.CTkFrame(adv_viz_frame, fg_color="transparent")
+        view_btn_frame.pack(padx=12, pady=4, fill="x")
+        ctk.CTkButton(view_btn_frame, text="Iso", command=lambda: self._set_view("iso"), width=50).pack(padx=2, side="left")
+        ctk.CTkButton(view_btn_frame, text="Arriba", command=lambda: self._set_view("top"), width=50).pack(padx=2, side="left")
+        ctk.CTkButton(view_btn_frame, text="Frente", command=lambda: self._set_view("front"), width=50).pack(padx=2, side="left")
+        ctk.CTkButton(view_btn_frame, text="Lado", command=lambda: self._set_view("side"), width=50).pack(padx=2, side="left")
 
         # === Control de resolución ===
         res_frame = ctk.CTkFrame(parent)
@@ -180,7 +209,22 @@ class MainWindow(ctk.CTk):
         ctk.CTkLabel(parent, text="Acciones", font=ctk.CTkFont(weight="bold")).pack(padx=12, pady=(8, 4), anchor="w")
         ctk.CTkButton(parent, text="📄 Exportar texto", command=self._export_text).pack(padx=12, pady=4, fill="x")
         ctk.CTkButton(parent, text="🖼️ Exportar imagen", command=self._export_image).pack(padx=12, pady=4, fill="x")
-        ctk.CTkButton(parent, text="📚 Teoría", command=self._show_theory).pack(padx=12, pady=4, fill="x")
+        ctk.CTkButton(parent, text="📋 Copiar al portapapeles", command=self._copy_to_clipboard).pack(padx=12, pady=4, fill="x")
+        
+        # === Sesión ===
+        session_frame = ctk.CTkFrame(parent)
+        session_frame.pack(padx=12, pady=(8, 8), fill="x")
+        ctk.CTkLabel(session_frame, text="Sesión", font=ctk.CTkFont(weight="bold")).pack(padx=12, pady=(8, 4), anchor="w")
+        ctk.CTkButton(session_frame, text="💾 Guardar sesión", command=self._save_session).pack(padx=12, pady=2, fill="x")
+        ctk.CTkButton(session_frame, text="📂 Cargar sesión", command=self._load_session).pack(padx=12, pady=2, fill="x")
+        
+        # === Análisis avanzado ===
+        analysis_frame = ctk.CTkFrame(parent)
+        analysis_frame.pack(padx=12, pady=(8, 12), fill="x")
+        ctk.CTkLabel(analysis_frame, text="Análisis Avanzado", font=ctk.CTkFont(weight="bold")).pack(padx=12, pady=(8, 4), anchor="w")
+        ctk.CTkButton(analysis_frame, text="🔍 Detectar singularidades", command=self._detect_singularities).pack(padx=12, pady=2, fill="x")
+        ctk.CTkButton(analysis_frame, text="📐 Calcular curvatura", command=self._calculate_curvature).pack(padx=12, pady=2, fill="x")
+        ctk.CTkButton(analysis_frame, text="📚 Teoría", command=self._show_theory).pack(padx=12, pady=4, fill="x")
 
         # === Sección: Calculadora vectorial rápida ===
         calc_frame = ctk.CTkFrame(parent)
@@ -302,28 +346,43 @@ class MainWindow(ctk.CTk):
         try:
             resolution = int(self.resolution_slider.get())
             colormap = self.colormap_combo.get()
+            contour_proj = self.contour_projection.get()
 
             self.model = self._read_model()
 
-            from surfacelab.visualization.vector_field_plot import VectorFieldRenderer
-
-            fig = VectorFieldRenderer.render_full_analysis(
+            # Usar MatplotlibSurfaceRenderer con opciones avanzadas
+            fig = MatplotlibSurfaceRenderer.render(
                 self.model.model,
-                vector_field=self.entry_flux.get(),
-                scalar_field=self.entry_scalar.get(),
                 resolution=resolution,
-                show_surface=True,
-                show_field=self.var_show_field.get(),
-                show_curl=self.var_show_curl.get(),
-                show_gradient=self.var_show_gradient.get(),
-                show_divergence=False,
                 show_normals=self.var_show_normals.get(),
-                colormap=colormap,
+                show_flux_field=self.var_show_field.get(),
+                normal_scale=0.4,
+                flux_scale=0.5,
                 alpha=0.85,
+                colormap=colormap,
+                show_wireframe=self.var_show_wireframe.get(),
+                show_axes=self.var_show_axes.get(),
+                show_contour=self.var_show_contour.get(),
+                contour_projection=contour_proj,
             )
             self._draw_figure(fig)
+            
+            # Información de opciones activas
+            info = f"✅ Superficie visualizada\n"
+            info += f"Resolución: {resolution} | Colormap: {colormap}\n"
+            opts = []
+            if self.var_show_wireframe.get(): opts.append("wireframe")
+            if self.var_show_axes.get(): opts.append("ejes")
+            if self.var_show_contour.get(): opts.append("contour")
+            if self.var_show_normals.get(): opts.append("normales")
+            if self.var_show_field.get(): opts.append("campo")
+            if opts:
+                info += f"Activos: {', '.join(opts)}"
+            else:
+                info += "Sin opciones adicionales"
+            
             self.result_text.delete("0.0", "end")
-            self.result_text.insert("0.0", f"✅ Superficie visualizada con éxito\nResolución: {resolution}\nColormap: {colormap}")
+            self.result_text.insert("0.0", info)
         except Exception as exc:
             self.result_text.delete("0.0", "end")
             self.result_text.insert("0.0", f"❌ Error al visualizar: {exc}\n\nUse Visualizar para reintentar")
@@ -560,6 +619,157 @@ LAPLACIANO (∇²f):
         
         self.result_text.delete("0.0", "end")
         self.result_text.insert("0.0", f"Modo {'oscuro' if self.dark_mode else 'claro'} activado (Ctrl+D)")
+
+    def _set_view(self, view_type: str):
+        """Establecer vista predefinida."""
+        try:
+            ax = self.ax
+            if view_type == "iso":
+                ax.view_init(elev=30, azim=45)
+            elif view_type == "top":
+                ax.view_init(elev=90, azim=0)
+            elif view_type == "front":
+                ax.view_init(elev=0, azim=0)
+            elif view_type == "side":
+                ax.view_init(elev=0, azim=90)
+            self.canvas.draw()
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"Vista cambiada a: {view_type}")
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"Error al cambiar vista: {e}")
+
+    def _copy_to_clipboard(self):
+        """Copiar resultado al portapapeles."""
+        try:
+            text = self.result_text.get("0.0", "end").strip()
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", "✅ Resultado copiado al portapapeles")
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"❌ Error al copiar: {e}")
+
+    def _save_session(self):
+        """Guardar sesión actual."""
+        try:
+            import json
+            path = ctk.filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+            if path:
+                session_data = {
+                    "system": self.system_combo.get(),
+                    "integral_type": self.integral_combo.get(),
+                    "func_expr": self.entry_func.get() if hasattr(self, 'entry_func') else "",
+                    "u_min": self.entry_u_min.get(),
+                    "u_max": self.entry_u_max.get(),
+                    "v_min": self.entry_v_min.get(),
+                    "v_max": self.entry_v_max.get(),
+                    "flux_expr": self.entry_flux.get(),
+                    "scalar_expr": self.entry_scalar.get(),
+                    "resolution": int(self.resolution_slider.get()),
+                    "colormap": self.colormap_combo.get(),
+                }
+                with open(path, "w") as f:
+                    json.dump(session_data, f)
+                self.result_text.delete("0.0", "end")
+                self.result_text.insert("0.0", f"✅ Sesión guardada en {path}")
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"❌ Error al guardar: {e}")
+
+    def _load_session(self):
+        """Cargar sesión guardada."""
+        try:
+            import json
+            path = ctk.filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+            if path:
+                with open(path, "r") as f:
+                    session_data = json.load(f)
+                
+                self.system_combo.set(session_data.get("system", "cartesian"))
+                self._build_dynamic_inputs()
+                self.integral_combo.set(session_data.get("integral_type", "area"))
+                
+                if hasattr(self, 'entry_func'):
+                    self.entry_func.delete(0, "end")
+                    self.entry_func.insert(0, session_data.get("func_expr", ""))
+                
+                self.entry_u_min.delete(0, "end")
+                self.entry_u_min.insert(0, session_data.get("u_min", "-2"))
+                self.entry_u_max.delete(0, "end")
+                self.entry_u_max.insert(0, session_data.get("u_max", "2"))
+                self.entry_v_min.delete(0, "end")
+                self.entry_v_min.insert(0, session_data.get("v_min", "-2"))
+                self.entry_v_max.delete(0, "end")
+                self.entry_v_max.insert(0, session_data.get("v_max", "2"))
+                
+                self.entry_flux.delete(0, "end")
+                self.entry_flux.insert(0, session_data.get("flux_expr", "x, y, z"))
+                
+                self.resolution_slider.set(session_data.get("resolution", 40))
+                self.colormap_combo.set(session_data.get("colormap", "viridis"))
+                
+                self.result_text.delete("0.0", "end")
+                self.result_text.insert("0.0", f"✅ Sesión cargada desde {path}")
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"❌ Error al cargar: {e}")
+
+    def _detect_singularities(self):
+        """Detectar singularidades en la superficie."""
+        try:
+            if self.model is None:
+                self.model = self._read_model()
+            
+            from surfacelab.visualization.surface_plot import SurfaceAnalyzer
+            result = SurfaceAnalyzer.detect_singularities(self.model.model, resolution=30)
+            
+            msg = f"🔍 DETECCIÓN DE SINGULARIDADES\n\n"
+            if result.get("has_singularities"):
+                msg += f"⚠️ {result.get('message')}\n\n"
+                if result.get("singular_points"):
+                    msg += "Puntos singulares:\n"
+                    for i, pt in enumerate(result["singular_points"][:5]):
+                        msg += f"  {i+1}. ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f})\n"
+            else:
+                msg += f"✅ {result.get('message', 'No se detectaron problemas')}"
+            
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", msg)
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"❌ Error: {e}")
+
+    def _calculate_curvature(self):
+        """Calcular curvatura de la superficie."""
+        try:
+            if self.model is None:
+                self.model = self._read_model()
+            
+            from surfacelab.visualization.surface_plot import SurfaceAnalyzer
+            result = SurfaceAnalyzer.calculate_curvature(self.model.model)
+            
+            msg = "📐 CURVATURA DE SUPERFICIE\n\n"
+            if "error" in result:
+                msg += f"❌ {result['error']}"
+            else:
+                msg += f"Curvatura Gaussiana K = {result.get('gaussian_curvature', 'N/A')}\n\n"
+                msg += f"Curvatura Media H = {result.get('mean_curvature', 'N/A')}\n\n"
+                msg += "Primera forma fundamental:\n"
+                msg += f"  E = {result.get('E', 'N/A')}\n"
+                msg += f"  F = {result.get('F', 'N/A')}\n"
+                msg += f"  G = {result.get('G', 'N/A')}\n\n"
+                msg += "Segunda forma fundamental:\n"
+                msg += f"  L = {result.get('L', 'N/A')}\n"
+                msg += f"  M = {result.get('M', 'N/A')}\n"
+                msg += f"  N = {result.get('N', 'N/A')}\n"
+            
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", msg)
+        except Exception as e:
+            self.result_text.delete("0.0", "end")
+            self.result_text.insert("0.0", f"❌ Error: {e}")
 
 
 def main():

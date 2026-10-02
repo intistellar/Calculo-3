@@ -206,3 +206,138 @@ class VectorCalculusPlot:
             return {"flux_expression": str(flux), "expression": flux}
         except Exception as e:
             return {"error": str(e)}
+# Funciones adicionales de análisis de superficie
+
+
+class SurfaceAnalyzer:
+    """Analizador de propiedades de superficies."""
+
+    @staticmethod
+    def detect_singularities(model: SurfaceModel, resolution: int = 50) -> dict:
+        """
+        Detectar singularidades en la superficie.
+        
+        Returns:
+            Dict con información sobre puntos singulares
+        """
+        try:
+            X, Y, Z = SurfacePlot.build_mesh(model, resolution)
+            
+            # Calcular Jacobian (diferencial de área)
+            if model.system.value == "cartesian":
+                from surfacelab.core.surface import CartesianSurface
+                surf = CartesianSurface(model)
+                dS = surf.differential_area(X, Y)
+            elif model.system.value == "parametric":
+                from surfacelab.core.parametrization import ParametricSurface
+                surf = ParametricSurface(model)
+                dS = surf.differential_area(
+                    np.linspace(model.limits.u_min, model.limits.u_max, resolution),
+                    np.linspace(model.limits.v_min, model.limits.v_max, resolution)
+                )
+            else:
+                return {"has_singularities": False, "message": "Sistema no soportado para detección de singularidades"}
+            
+            # Detectar dónde el Jacobian es cero o muy pequeño
+            threshold = 1e-6
+            singular_mask = np.abs(dS) < threshold
+            singular_count = np.sum(singular_mask)
+            
+            if singular_count > 0:
+                singular_coords = []
+                for i in range(resolution):
+                    for j in range(resolution):
+                        if singular_mask[i, j]:
+                            singular_coords.append((float(X[i,j]), float(Y[i,j]), float(Z[i,j])))
+                
+                return {
+                    "has_singularities": True,
+                    "singular_count": singular_count,
+                    "singular_points": singular_coords[:10],  # Máximo 10 puntos
+                    "message": f"Se detectaron {singular_count} puntos singulares"
+                }
+            
+            return {"has_singularities": False, "message": "No se detectaron singularidades"}
+            
+        except Exception as e:
+            return {"has_singularities": False, "error": str(e)}
+
+    @staticmethod
+    def calculate_curvature(model: SurfaceModel, resolution: int = 20) -> dict:
+        """
+        Calcular curvatura gaussiana y media de la superficie.
+        
+        Returns:
+            Dict con curvaturas
+        """
+        try:
+            if model.system.value != "cartesian":
+                return {"error": "Solo se soporta curvatura para superficies cartesianas"}
+            
+            x_sym, y_sym = sp.Symbol("x"), sp.Symbol("y")
+            f = model.func_expr
+            
+            if f is None:
+                return {"error": "No hay función definida"}
+            
+            # Primeras derivadas
+            fx = sp.diff(f, x_sym)
+            fy = sp.diff(f, y_sym)
+            
+            # Segundas derivadas
+            fxx = sp.diff(fx, x_sym)
+            fyy = sp.diff(fy, y_sym)
+            fxy = sp.diff(fx, y_sym)
+            
+            # Coeficientes de la primera forma fundamental
+            E = 1 + fx**2
+            G = 1 + fy**2
+            F = fx * fy
+            
+            # Coeficientes de la segunda forma fundamental
+            L = fxx / sp.sqrt(1 + fx**2 + fy**2)
+            M = fxy / sp.sqrt(1 + fx**2 + fy**2)
+            N = fyy / sp.sqrt(1 + fx**2 + fy**2)
+            
+            # Curvatura gaussiana K = (LN - M²) / (EG - F²)
+            K = sp.simplify((L*N - M**2) / (E*G - F**2))
+            
+            # Curvatura media H = (EN - 2FM + GL) / 2(EG - F²)
+            H = sp.simplify((E*N - 2*F*M + G*L) / (2*(E*G - F**2)))
+            
+            return {
+                "gaussian_curvature": str(K),
+                "mean_curvature": str(H),
+                "E": str(E), "F": str(F), "G": str(G),
+                "L": str(L), "M": str(M), "N": str(N),
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
+    def create_slice(model: SurfaceModel, axis: str = "x", value: float = 0.0, resolution: int = 50) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Crear un slice (corte) de la superficie.
+        
+        Args:
+            axis: Eje del corte ("x", "y", o "z")
+            value: Valor del plano de corte
+            
+        Returns:
+            Tupla de arrays (X, Y, Z) del slice
+        """
+        X, Y, Z = SurfacePlot.build_mesh(model, resolution)
+        
+        if axis == "x":
+            # Slice en plano YZ
+            idx = np.argmin(np.abs(X[:, 0, 0] - value))
+            return None, Y[idx, :], Z[idx, :]
+        elif axis == "y":
+            idx = np.argmin(np.abs(Y[0, :, 0] - value))
+            return X[idx, :], None, Z[idx, :]
+        elif axis == "z":
+            idx = np.argmin(np.abs(Z[0, 0, :] - value))
+            return X[:, :, idx], Y[:, :, idx], None
+            
+        return X, Y, Z
